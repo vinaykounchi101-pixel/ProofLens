@@ -22,6 +22,26 @@ class ProofLensException(Exception):
         self.details = details or {}
 
 
+class AuthenticationException(ProofLensException):
+    def __init__(self, message: str = "Authentication required or invalid credentials.", details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            error_code="UNAUTHENTICATED",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            details=details,
+        )
+
+
+class UnauthorizedException(ProofLensException):
+    def __init__(self, message: str = "You do not have permission to access this resource.", details: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            message=message,
+            error_code="UNAUTHORIZED",
+            status_code=status.HTTP_403_FORBIDDEN,
+            details=details,
+        )
+
+
 class ResourceNotFoundException(ProofLensException):
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
         super().__init__(

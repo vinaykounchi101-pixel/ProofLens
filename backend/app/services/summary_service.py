@@ -44,6 +44,9 @@ class SummaryService:
         sample_texts = chunk_res.scalars().all()
         combined_sample = "\n\n".join(sample_texts) if sample_texts else ""
 
+        from app.core.usage import usage_tracker
+        usage_tracker.check_and_record(workspace_id)
+
         llm_adapter = get_llm_adapter()
         summary_data = await llm_adapter.generate_summary(combined_sample)
 

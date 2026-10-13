@@ -103,7 +103,7 @@ export default function EvaluationPage() {
                 <BarChart3 className="h-4 w-4 text-indigo-400" />
               </div>
               <div className="mt-2 text-2xl font-bold font-mono text-white">
-                {((activeRun.metrics.retrieval_recall ?? 0.94) * 100).toFixed(1)}%
+                {((activeRun.metrics.retrieval_recall ?? 0.0) * 100).toFixed(1)}%
               </div>
               <p className="mt-1 text-[11px] text-slate-500">Gold chunk match in top-k</p>
             </div>
@@ -115,7 +115,7 @@ export default function EvaluationPage() {
                 <CheckCircle2 className="h-4 w-4 text-emerald-400" />
               </div>
               <div className="mt-2 text-2xl font-bold font-mono text-emerald-300">
-                {((activeRun.metrics.citation_accuracy ?? 0.96) * 100).toFixed(1)}%
+                {((activeRun.metrics.citation_accuracy ?? 0.0) * 100).toFixed(1)}%
               </div>
               <p className="mt-1 text-[11px] text-slate-500">Verified page-level quotes</p>
             </div>
@@ -127,7 +127,7 @@ export default function EvaluationPage() {
                 <Shield className="h-4 w-4 text-amber-400" />
               </div>
               <div className="mt-2 text-2xl font-bold font-mono text-amber-300">
-                {((activeRun.metrics.abstention_accuracy ?? 1.0) * 100).toFixed(1)}%
+                {((activeRun.metrics.abstention_accuracy ?? 0.0) * 100).toFixed(1)}%
               </div>
               <p className="mt-1 text-[11px] text-slate-500">Refusal on no-evidence queries</p>
             </div>

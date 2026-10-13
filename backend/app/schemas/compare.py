@@ -22,6 +22,7 @@ class ComparisonFinding(BaseModel):
     description: str
     document_a: Optional[DocumentSourceRef] = None
     document_b: Optional[DocumentSourceRef] = None
+    sources: List[DocumentSourceRef] = []
 
 
 class CompareResponse(BaseModel):

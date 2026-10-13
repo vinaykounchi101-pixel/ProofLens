@@ -50,10 +50,12 @@ def second_sample_pdf_bytes() -> bytes:
 
 @pytest_asyncio.fixture
 async def async_client():
-    # Setup test tables
+    # Setup test tables freshly
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         yield client
+

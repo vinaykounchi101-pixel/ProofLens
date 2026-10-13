@@ -1,7 +1,7 @@
 """Document Chunk ORM model with Vector embeddings."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base, VectorType
@@ -20,7 +20,11 @@ class DocumentChunk(Base):
     token_count: Mapped[int] = mapped_column(Integer, nullable=False)
     embedding_model: Mapped[str] = mapped_column(String(64), nullable=False)
     embedding = mapped_column(VectorType(768), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
 
     __table_args__ = (
         UniqueConstraint("document_id", "chunk_index", name="uq_doc_chunk_index"),

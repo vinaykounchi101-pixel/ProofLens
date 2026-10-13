@@ -1,7 +1,7 @@
 # ProofLens AI — Phased Implementation Plan
 
-**Document Version:** 2.1 (Full-Stack Implementation Complete)  
-**Status:** Implemented & Verified — Full-Stack MVP Operational  
+**Document Version:** 2.2 (Hardened & Verified Production Baseline)  
+**Status:** Hardened, Tested & Verified — Full-Stack MVP Operational  
 **Date:** October 2026  
 **Primary Architecture Baseline:** [docs/TECHNICAL-DESIGN.md](file:///e:/Projects/ProofLens/docs/TECHNICAL-DESIGN.md) (TDD v2.0)  
 **Product Specification:** [docs/ProofLens_AI_PRD_v0.2.md](file:///e:/Projects/ProofLens/docs/ProofLens_AI_PRD_v0.2.md) (PRD v0.2, dated 12 October 2026 — Verified Source of Truth)  
@@ -410,10 +410,11 @@ graph TD
 ## 4. Phase Completion Checklist
 
 - [x] **Phase 0:** Technical Design and Implementation Plan documented and approved.
-- [ ] **Phase 1:** Project foundation, database with pgvector, health checks, and migrations.
-- [ ] **Phase 2:** PDF validation, local storage, page-level extraction, status transitions, retry, and deletion.
-- [ ] **Phase 3:** Text chunking, batch embeddings (gemini-embedding-2, 768-dim), pgvector storage, and vector retrieval.
-- [ ] **Phase 4:** RAG orchestration (gemini-2.5-flash), citation validation, honest abstention, and saved query history.
-- [ ] **Phase 5:** Next.js frontend, document library, document summaries, Q&A citation inspector, history replay, and quota handling.
-- [ ] **Phase 6:** Cross-document comparison engine and comparative matrix UI.
-- [ ] **Phase 7:** Automated evaluation harness, security testing, baseline report, and demo setup.
+- [x] **Phase 1:** Project foundation, database with dialect-aware VectorType, health checks, and Alembic versioned migrations.
+- [x] **Phase 2:** PDF validation, bounded streaming upload, local storage traversal guards, page-level extraction, status transitions, idempotent retry, and deletion cascades.
+- [x] **Phase 3:** Text chunking, batch embeddings (gemini-embedding-2, 768-dim), pgvector storage, in-database similarity, and workspace-scoped retrieval.
+- [x] **Phase 4:** RAG orchestration (gemini-2.5-flash), citation semantics separating excerpt validity and claim support, honest abstention, and saved query history with true document provenance.
+- [x] **Phase 5:** Next.js App Router frontend, Tailwind CSS styling, document library, document summaries, Q&A citation inspector, history replay, and quota handling.
+- [x] **Phase 6:** Cross-document comparison engine and comparative matrix UI.
+- [x] **Phase 7:** Automated evaluation harness (25 version-controlled benchmark cases), security isolation testing, 23/23 tests passing, baseline report, and demo setup.
+

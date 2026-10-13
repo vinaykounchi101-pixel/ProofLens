@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters import get_embedding_adapter, get_llm_adapter
 from app.core.usage import usage_tracker
 from app.models.query_history import QueryRun, RetrievedEvidence, Answer, Citation
-from app.schemas.qa import QAResponse, CitationItem
+from app.schemas.qa import QAResponse, CitationItem, ClaimItem
 from app.services.citation_service import citation_validator
 from app.services.retrieval_service import retrieval_service
 
@@ -19,11 +19,13 @@ class RAGService:
         question: str,
         document_ids: List[str],
         top_k: int = 5,
+        track_usage: bool = True,
     ) -> QAResponse:
         start_time = time.time()
 
         # Enforce rate-limits and daily quotas (FR-14)
-        usage_tracker.check_and_record(workspace_id)
+        if track_usage:
+            usage_tracker.check_and_record(workspace_id)
 
         embedding_adapter = get_embedding_adapter()
         llm_adapter = get_llm_adapter()
@@ -56,6 +58,7 @@ class RAGService:
                 query_run_id=query_run.id,
                 answer_text="The available documents do not contain evidence to answer this question.",
                 evidence_status="insufficient_evidence",
+                claims=[],
                 latency_ms=latency_ms,
             )
             session.add(answer_row)
@@ -66,6 +69,7 @@ class RAGService:
                 question=question,
                 answer="The available documents do not contain evidence to answer this question.",
                 evidence_status="insufficient_evidence",
+                claims=[],
                 citations=[],
                 unsupported_aspects="No relevant passages found in selected documents.",
                 latency_ms=latency_ms,
@@ -92,7 +96,7 @@ class RAGService:
             evidence_passages=evidence_passages,
         )
 
-        # Step 6: Validate citations and assign evidence status
+        # Step 6: Validate citations, verify claims, and assign evidence status
         val_result = citation_validator.validate(
             raw_llm_output=raw_llm_output,
             retrieved_chunks=retrieved_chunks,
@@ -101,6 +105,39 @@ class RAGService:
 
         answer_text = raw_llm_output.get("answer", "")
         latency_ms = int((time.time() - start_time) * 1000)
+
+        # Build claim serializable objects
+        claims_data = []
+        claim_items: List[ClaimItem] = []
+        for c in val_result.validated_claims:
+            claim_citations = [
+                CitationItem(
+                    citation_id=cite.citation_id,
+                    document_id=cite.document_id,
+                    document_filename=cite.document_filename,
+                    page_number=cite.page_number,
+                    cited_excerpt=cite.cited_excerpt,
+                    is_reference_valid=cite.is_reference_valid,
+                    is_excerpt_valid=cite.is_excerpt_valid,
+                    is_verified=cite.is_verified,
+                    is_repaired=cite.is_repaired,
+                    repair_reason=cite.repair_reason,
+                )
+                for cite in c.citations
+            ]
+            claim_items.append(
+                ClaimItem(
+                    claim_text=c.claim_text,
+                    cited_evidence_ids=c.cited_evidence_ids,
+                    support_level=c.support_level,
+                    citations=claim_citations,
+                )
+            )
+            claims_data.append({
+                "claim_text": c.claim_text,
+                "cited_evidence_ids": c.cited_evidence_ids,
+                "support_level": c.support_level,
+            })
 
         # Step 7: Audit persistence for history replay (FR-12)
         query_run = QueryRun(
@@ -125,6 +162,7 @@ class RAGService:
             query_run_id=query_run.id,
             answer_text=answer_text,
             evidence_status=val_result.evidence_status,
+            claims=claims_data,
             latency_ms=latency_ms,
         )
         session.add(answer_row)
@@ -135,9 +173,15 @@ class RAGService:
             cite_row = Citation(
                 answer_id=answer_row.id,
                 chunk_id=cite.chunk_id,
+                document_id=cite.document_id,
+                document_filename=cite.document_filename,
                 page_number=cite.page_number,
                 cited_excerpt=cite.cited_excerpt,
+                is_reference_valid=cite.is_reference_valid,
+                is_excerpt_valid=cite.is_excerpt_valid,
                 is_verified=cite.is_verified,
+                is_repaired=cite.is_repaired,
+                repair_reason=cite.repair_reason,
             )
             session.add(cite_row)
             citation_items.append(
@@ -147,7 +191,11 @@ class RAGService:
                     document_filename=cite.document_filename,
                     page_number=cite.page_number,
                     cited_excerpt=cite.cited_excerpt,
+                    is_reference_valid=cite.is_reference_valid,
+                    is_excerpt_valid=cite.is_excerpt_valid,
                     is_verified=cite.is_verified,
+                    is_repaired=cite.is_repaired,
+                    repair_reason=cite.repair_reason,
                 )
             )
 
@@ -158,6 +206,7 @@ class RAGService:
             question=question,
             answer=answer_text,
             evidence_status=val_result.evidence_status,
+            claims=claim_items,
             citations=citation_items,
             unsupported_aspects=val_result.unsupported_aspects,
             latency_ms=latency_ms,

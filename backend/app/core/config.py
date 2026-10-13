@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Any
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_BYTES: int = 15 * 1024 * 1024  # 15 MB
     MAX_PAGES_PER_DOCUMENT: int = 50
 
+    # Unified Gemini API Key (populates both embedding and LLM keys if set)
+    GEMINI_API_KEY: SecretStr = SecretStr("")
+
     # AI Provider: Embeddings (gemini-embedding-2 verified active)
     EMBEDDING_PROVIDER: str = "mock"  # "gemini" or "mock"
     EMBEDDING_API_KEY: SecretStr = SecretStr("")
@@ -60,11 +63,32 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_MINUTE: int = 15
     MAX_DAILY_QUERIES: int = 200
 
+    # Development & Auth Configuration
+    DEFAULT_DEV_USER_ID: str = "dev-user-00000000-0000-0000-0000-000000000001"
+    DEFAULT_DEV_USER_EMAIL: str = "dev@prooflens.local"
+    DEFAULT_DEV_API_KEY: str = "prooflens_dev_api_key_test_12345"
+
     @field_validator("STORAGE_DIR", mode="after")
     @classmethod
     def ensure_storage_dir(cls, v: Path) -> Path:
         v.mkdir(parents=True, exist_ok=True)
         return v
+
+    def model_post_init(self, __context: Any) -> None:
+        # If GEMINI_API_KEY is provided, automatically populate providers and keys
+        gemini_key = self.GEMINI_API_KEY.get_secret_value()
+        if gemini_key:
+            if not self.EMBEDDING_API_KEY.get_secret_value():
+                self.EMBEDDING_API_KEY = SecretStr(gemini_key)
+                self.EMBEDDING_PROVIDER = "gemini"
+            if not self.LLM_API_KEY.get_secret_value():
+                self.LLM_API_KEY = SecretStr(gemini_key)
+                self.LLM_PROVIDER = "gemini"
+
+        # Production safety guard: reject insecure default secret
+        if self.ENVIRONMENT.lower() == "production":
+            if self.SECRET_KEY.startswith("prooflens-insecure"):
+                raise ValueError("Production mode requires configuring a secure, non-default SECRET_KEY.")
 
 
 settings = Settings()

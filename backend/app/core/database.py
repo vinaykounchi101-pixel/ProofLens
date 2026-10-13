@@ -3,7 +3,7 @@
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import TypeDecorator, JSON
+from sqlalchemy import TypeDecorator, JSON, event
 from app.core.config import settings
 
 # Engine setup
@@ -17,6 +17,15 @@ engine = create_async_engine(
     future=True,
     connect_args=connect_args,
 )
+
+# Enforce foreign key constraints and cascades in SQLite
+if "sqlite" in settings.DATABASE_URL:
+    @event.listens_for(engine.sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
 
 async_session_factory = async_sessionmaker(
     engine,

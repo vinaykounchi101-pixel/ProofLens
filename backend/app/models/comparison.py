@@ -1,7 +1,7 @@
 """Comparison run ORM model for Cross-Document Comparison (FR-10)."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
@@ -15,6 +15,10 @@ class ComparisonRun(Base):
     topic: Mapped[str] = mapped_column(Text, nullable=False)
     target_doc_ids: Mapped[list] = mapped_column(JSON, nullable=False)
     findings: Mapped[list] = mapped_column(JSON, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
 
     workspace = relationship("Workspace", back_populates="comparison_runs")

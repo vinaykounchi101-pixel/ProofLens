@@ -1,3 +1,4 @@
+from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.document import Document
 from app.models.chunk import DocumentChunk
@@ -6,6 +7,7 @@ from app.models.comparison import ComparisonRun
 from app.models.evaluation import EvaluationRun, EvaluationResult
 
 __all__ = [
+    "User",
     "Workspace",
     "Document",
     "DocumentChunk",

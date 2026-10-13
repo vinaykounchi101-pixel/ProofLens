@@ -38,9 +38,62 @@ class RetrievalService:
     ) -> List[RetrievedChunk]:
         """
         Retrieves top-k candidate chunks strictly filtered by workspace_id and document_ids.
-        Supports both PostgreSQL (pgvector) and SQLite (in-memory cosine).
+        Uses in-database vector similarity search (<=> cosine distance) on PostgreSQL/pgvector,
+        and falls back to in-memory cosine similarity on SQLite.
         """
-        # Join chunks with document to get original_filename
+        if not document_ids or not query_vector:
+            return []
+
+        # Check database dialect
+        bind = session.get_bind() if hasattr(session, "get_bind") else getattr(session, "bind", None)
+        dialect_name = bind.dialect.name if bind else "sqlite"
+
+        if dialect_name == "postgresql":
+            try:
+                from pgvector.sqlalchemy import Vector
+                cos_dist = DocumentChunk.embedding.cosine_distance(query_vector)
+                stmt = (
+                    select(
+                        DocumentChunk.id,
+                        DocumentChunk.document_id,
+                        DocumentChunk.page_number,
+                        DocumentChunk.content,
+                        Document.original_filename,
+                        cos_dist.label("distance"),
+                    )
+                    .join(Document, DocumentChunk.document_id == Document.id)
+                    .where(
+                        and_(
+                            DocumentChunk.workspace_id == workspace_id,
+                            DocumentChunk.document_id.in_(document_ids),
+                            Document.status == "indexed",
+                            cos_dist <= (1.0 - threshold),
+                        )
+                    )
+                    .order_by(cos_dist.asc())
+                    .limit(top_k)
+                )
+
+                res = await session.execute(stmt)
+                rows = res.all()
+
+                return [
+                    RetrievedChunk(
+                        chunk_id=row[0],
+                        document_id=row[1],
+                        document_filename=row[4],
+                        page_number=row[2],
+                        content=row[3],
+                        similarity_score=round(max(0.0, 1.0 - float(row[5])), 4),
+                        rank=idx + 1,
+                    )
+                    for idx, row in enumerate(rows)
+                ]
+            except Exception:
+                # If pgvector extension/column isn't configured in PostgreSQL, fallback to in-memory
+                pass
+
+        # SQLite / In-Memory Fallback
         stmt = (
             select(
                 DocumentChunk.id,
@@ -66,7 +119,6 @@ class RetrievalService:
         scored_candidates = []
         for row in rows:
             chunk_id, doc_id, page_num, content, emb, filename = row
-            # If embedding is stored as JSON list or Vector object
             emb_list = list(emb) if hasattr(emb, "__iter__") else []
             if not emb_list:
                 continue

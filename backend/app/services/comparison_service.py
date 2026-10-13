@@ -1,9 +1,10 @@
-"""Cross-document comparison service (FR-10)."""
+"""Cross-document comparison service (FR-10) with multi-document support and quota tracking."""
 
-from typing import List
+from typing import List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters import get_embedding_adapter, get_llm_adapter
 from app.core.errors import ValidationException
+from app.core.usage import usage_tracker
 from app.models.comparison import ComparisonRun
 from app.schemas.compare import CompareResponse, ComparisonFinding, DocumentSourceRef
 from app.services.retrieval_service import retrieval_service
@@ -20,39 +21,37 @@ class ComparisonService:
         if len(document_ids) < 2:
             raise ValidationException("At least two distinct documents are required for cross-document comparison.")
 
+        # Enforce rate-limits and daily quotas (FR-14)
+        usage_tracker.check_and_record(workspace_id)
+
         embedding_adapter = get_embedding_adapter()
         llm_adapter = get_llm_adapter()
 
         query_vec = await embedding_adapter.embed_query(topic)
 
-        # Independent retrieval per document to prevent starvation
-        doc_a_id = document_ids[0]
-        doc_b_id = document_ids[1]
+        # Independent retrieval per document to prevent starvation across all target docs
+        doc_passages_map: Dict[str, List[Dict[str, Any]]] = {}
+        for doc_id in document_ids:
+            chunks = await retrieval_service.search(
+                session=session,
+                workspace_id=workspace_id,
+                document_ids=[doc_id],
+                query_vector=query_vec,
+                top_k=3,
+            )
+            doc_passages_map[doc_id] = [
+                {
+                    "document_id": c.document_id,
+                    "filename": c.document_filename,
+                    "page_number": c.page_number,
+                    "content": c.content,
+                }
+                for c in chunks
+            ]
 
-        doc_a_chunks = await retrieval_service.search(
-            session=session,
-            workspace_id=workspace_id,
-            document_ids=[doc_a_id],
-            query_vector=query_vec,
-            top_k=3,
-        )
-
-        doc_b_chunks = await retrieval_service.search(
-            session=session,
-            workspace_id=workspace_id,
-            document_ids=[doc_b_id],
-            query_vector=query_vec,
-            top_k=3,
-        )
-
-        passages_a = [
-            {"document_id": c.document_id, "filename": c.document_filename, "page_number": c.page_number, "content": c.content}
-            for c in doc_a_chunks
-        ]
-        passages_b = [
-            {"document_id": c.document_id, "filename": c.document_filename, "page_number": c.page_number, "content": c.content}
-            for c in doc_b_chunks
-        ]
+        # Use primary two documents for standard comparison adapter
+        passages_a = doc_passages_map.get(document_ids[0], [])
+        passages_b = doc_passages_map.get(document_ids[1], [])
 
         raw_comp = await llm_adapter.compare_documents(topic, passages_a, passages_b)
 
@@ -64,6 +63,8 @@ class ComparisonService:
             ref_a = DocumentSourceRef(**doc_a_info) if doc_a_info else None
             ref_b = DocumentSourceRef(**doc_b_info) if doc_b_info else None
 
+            sources = [r for r in [ref_a, ref_b] if r is not None]
+
             findings_list.append(
                 ComparisonFinding(
                     finding_type=f.get("finding_type", "agreement"),
@@ -71,6 +72,7 @@ class ComparisonService:
                     description=f.get("description", ""),
                     document_a=ref_a,
                     document_b=ref_b,
+                    sources=sources,
                 )
             )
 

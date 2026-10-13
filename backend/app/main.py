@@ -24,8 +24,11 @@ async def lifespan(app: FastAPI):
                 await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
             except Exception as e:
                 logger.warning(f"Could not enable pgvector extension automatically: {e}")
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables initialized successfully.")
+        if settings.ENVIRONMENT == "development" or "sqlite" in settings.DATABASE_URL:
+            await conn.run_sync(Base.metadata.create_all)
+        else:
+            logger.info("Production environment: Schema is managed via versioned Alembic migrations.")
+    logger.info("Database initialized successfully.")
     yield
     await engine.dispose()
     logger.info("ProofLens AI backend shutdown complete.")

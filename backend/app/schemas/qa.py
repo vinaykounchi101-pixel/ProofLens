@@ -16,7 +16,18 @@ class CitationItem(BaseModel):
     document_filename: str
     page_number: int
     cited_excerpt: str
+    is_reference_valid: bool = True
+    is_excerpt_valid: bool = True
     is_verified: bool = True
+    is_repaired: bool = False
+    repair_reason: Optional[str] = None
+
+
+class ClaimItem(BaseModel):
+    claim_text: str
+    cited_evidence_ids: List[str] = []
+    support_level: str = "supported"  # supported, unsupported, contradicted, unverified
+    citations: List[CitationItem] = []
 
 
 class QAResponse(BaseModel):
@@ -24,6 +35,7 @@ class QAResponse(BaseModel):
     question: str
     answer: str
     evidence_status: str  # supported, partially_supported, conflicting_evidence, insufficient_evidence
+    claims: List[ClaimItem] = []
     citations: List[CitationItem] = []
     unsupported_aspects: Optional[str] = None
     latency_ms: int = 0
