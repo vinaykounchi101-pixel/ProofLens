@@ -42,21 +42,21 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div className="flex items-center justify-between border-b border-slate-200 pb-4">
         <div className="flex items-center gap-2.5">
-          <div className="rounded-lg bg-indigo-600/20 p-2 text-indigo-400">
+          <div className="rounded-lg bg-indigo-50 border border-indigo-100 p-2 text-indigo-600">
             <History className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-white">Provenance & Query Audit Trail</h2>
-            <p className="text-xs text-slate-400">
+            <h2 className="text-base font-semibold text-slate-900">Provenance & Query Audit Trail</h2>
+            <p className="text-xs text-slate-500">
               Complete audit log of questions asked, citations generated, and evidence retrieved.
             </p>
           </div>
         </div>
         <button
           onClick={loadHistory}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-800 px-2.5 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
+          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-xs"
         >
           <RefreshCw className="h-3 w-3" />
           Refresh
@@ -66,10 +66,10 @@ export default function HistoryPage() {
       {loading ? (
         <div className="py-12 text-center text-sm text-slate-500">Loading audit log...</div>
       ) : historyItems.length === 0 ? (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/20 py-16 text-center">
-          <MessageSquare className="mx-auto h-10 w-10 text-slate-700" />
-          <p className="mt-3 text-sm font-medium text-slate-400">No query history in this workspace yet</p>
-          <p className="mt-1 text-xs text-slate-600">Questions submitted in the Grounded Q&A tab will be logged here.</p>
+        <div className="rounded-2xl border border-slate-200 bg-white py-16 text-center shadow-xs">
+          <MessageSquare className="mx-auto h-10 w-10 text-slate-400" />
+          <p className="mt-3 text-sm font-medium text-slate-700">No query history in this workspace yet</p>
+          <p className="mt-1 text-xs text-slate-500">Questions submitted in the Grounded Q&A tab will be logged here.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -78,7 +78,7 @@ export default function HistoryPage() {
             return (
               <div
                 key={item.id}
-                className="overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/40 transition hover:border-slate-700"
+                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs transition hover:border-slate-300 hover:shadow-sm"
               >
                 <div
                   onClick={() => setExpandedRunId(isExpanded ? null : item.id)}
@@ -90,27 +90,27 @@ export default function HistoryPage() {
                         {new Date(item.created_at).toLocaleString()}
                       </span>
                       {item.answer?.insufficient_evidence ? (
-                        <span className="rounded bg-amber-950/60 px-2 py-0.5 text-[10px] font-semibold text-amber-300 border border-amber-800/40">
+                        <span className="rounded bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">
                           Abstention
                         </span>
                       ) : (
-                        <span className="rounded bg-emerald-950/60 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 border border-emerald-800/40">
+                        <span className="rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 border border-emerald-200">
                           Grounded
                         </span>
                       )}
                       {item.citations && (
-                        <span className="text-[11px] font-mono text-slate-400">
+                        <span className="text-[11px] font-mono text-slate-500">
                           {item.citations.length} citation{item.citations.length === 1 ? '' : 's'}
                         </span>
                       )}
                     </div>
-                    <h3 className="text-sm font-semibold text-white">{item.question}</h3>
+                    <h3 className="text-sm font-semibold text-slate-900">{item.question}</h3>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <ChevronDown
-                      className={`h-4 w-4 text-slate-500 transition-transform ${
-                        isExpanded ? 'rotate-180 text-white' : ''
+                      className={`h-4 w-4 text-slate-400 transition-transform ${
+                        isExpanded ? 'rotate-180 text-indigo-600' : ''
                       }`}
                     />
                   </div>
@@ -118,29 +118,29 @@ export default function HistoryPage() {
 
                 {/* Expanded Answer and Citations */}
                 {isExpanded && item.answer && (
-                  <div className="border-t border-slate-800/80 bg-slate-950/70 p-5 space-y-4 text-xs">
+                  <div className="border-t border-slate-100 bg-slate-50/70 p-5 space-y-4 text-xs">
                     <div>
-                      <span className="font-semibold uppercase tracking-wider text-slate-400 text-[10px]">
+                      <span className="font-semibold uppercase tracking-wider text-slate-500 text-[10px]">
                         Recorded Answer
                       </span>
-                      <p className="mt-1.5 text-slate-300 leading-relaxed whitespace-pre-line text-sm">
+                      <p className="mt-1.5 text-slate-800 leading-relaxed whitespace-pre-line text-sm">
                         {item.answer.answer_text}
                       </p>
                     </div>
 
                     {item.citations && item.citations.length > 0 && (
-                      <div className="pt-3 border-t border-slate-800/60">
-                        <span className="font-semibold uppercase tracking-wider text-slate-400 text-[10px]">
+                      <div className="pt-3 border-t border-slate-200/80">
+                        <span className="font-semibold uppercase tracking-wider text-slate-500 text-[10px]">
                           Cited Provenance
                         </span>
                         <div className="mt-2 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                           {item.citations.map((c, cIdx) => (
-                            <div key={cIdx} className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-                              <div className="flex items-center justify-between text-[11px] font-mono text-indigo-400 mb-1">
+                            <div key={cIdx} className="rounded-lg border border-slate-200 bg-white p-3 shadow-xs">
+                              <div className="flex items-center justify-between text-[11px] font-mono text-indigo-600 mb-1">
                                 <span>[{c.citation_index}] Page {c.page_number}</span>
                                 <span className="text-slate-500">{c.validation_status}</span>
                               </div>
-                              <p className="text-slate-300 italic text-[11px]">&ldquo;{c.excerpt}&rdquo;</p>
+                              <p className="text-slate-700 italic text-[11px]">&ldquo;{c.excerpt}&rdquo;</p>
                             </div>
                           ))}
                         </div>

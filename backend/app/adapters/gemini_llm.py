@@ -13,9 +13,12 @@ from app.core.errors import ProviderUnavailableException, QuotaExhaustedExceptio
 class GeminiLLMAdapter(LLMAdapter):
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
+    FALLBACK_MODELS = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.6-flash"]
+
     def __init__(self):
-        self.api_key = settings.LLM_API_KEY.get_secret_value()
-        self.model = settings.LLM_MODEL.replace("models/", "")
+        self.api_key = settings.LLM_API_KEY.get_secret_value() or settings.GEMINI_API_KEY.get_secret_value()
+        model_name = settings.LLM_MODEL.replace("models/", "")
+        self.model = "gemini-3.5-flash" if model_name in ("gemini", "", "default", "gemini-2.5-flash") else model_name
 
     async def _generate_content_json(self, system_instruction: str, prompt: str, max_retries: int = 3) -> dict:
         url = f"{self.BASE_URL}/models/{self.model}:generateContent?key={self.api_key}"
@@ -48,6 +51,27 @@ class GeminiLLMAdapter(LLMAdapter):
                         raise QuotaExhaustedException("Gemini generation rate limit or quota exceeded.")
                     backoff = (2 ** attempt) + random.uniform(0.1, 0.5)
                     await asyncio.sleep(backoff)
+                elif resp.status_code in (404, 503):
+                    for fallback in self.FALLBACK_MODELS:
+                        if fallback != self.model:
+                            self.model = fallback
+                            new_url = f"{self.BASE_URL}/models/{fallback}:generateContent?key={self.api_key}"
+                            async with httpx.AsyncClient(timeout=float(settings.LLM_TIMEOUT_SECONDS)) as client:
+                                fb_resp = await client.post(new_url, json=payload)
+                            if fb_resp.status_code == 200:
+                                data = fb_resp.json()
+                                candidates = data.get("candidates", [])
+                                if candidates:
+                                    content_parts = candidates[0].get("content", {}).get("parts", [])
+                                    if content_parts:
+                                        raw_text = content_parts[0].get("text", "{}")
+                                        return json.loads(raw_text)
+                    if resp.status_code == 404:
+                        err_msg = resp.text[:200]
+                        raise ProviderUnavailableException(f"Gemini LLM model not found: {err_msg}")
+                    if attempt == max_retries - 1:
+                        raise ProviderUnavailableException("Gemini generation service unavailable.")
+                    await asyncio.sleep(1.0)
                 elif resp.status_code >= 500:
                     if attempt == max_retries - 1:
                         raise ProviderUnavailableException("Gemini generation service unavailable.")

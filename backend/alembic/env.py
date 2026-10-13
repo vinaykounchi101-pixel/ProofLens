@@ -51,6 +51,11 @@ async def run_async_migrations() -> None:
     connect_args = {}
     if "sqlite" in settings.DATABASE_URL:
         connect_args["check_same_thread"] = False
+    elif "pooler" in settings.DATABASE_URL or "supabase" in settings.DATABASE_URL:
+        connect_args = {
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+        }
 
     connectable = async_engine_from_config(
         configuration,

@@ -12,10 +12,12 @@ from app.core.logging import logger
 
 class GeminiEmbeddingAdapter(EmbeddingAdapter):
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
+    FALLBACK_MODELS = ["gemini-embedding-2", "gemini-embedding-001"]
 
     def __init__(self):
-        self.api_key = settings.EMBEDDING_API_KEY.get_secret_value()
-        self.model = settings.EMBEDDING_MODEL.replace("models/", "")
+        self.api_key = settings.EMBEDDING_API_KEY.get_secret_value() or settings.GEMINI_API_KEY.get_secret_value()
+        model_name = settings.EMBEDDING_MODEL.replace("models/", "")
+        self.model = "gemini-embedding-2" if model_name in ("gemini", "", "default") else model_name
         self.dim = settings.EMBEDDING_DIMENSIONS
 
     async def _post_with_retry(self, endpoint: str, json_data: dict, max_retries: int = 3) -> dict:
@@ -32,6 +34,23 @@ class GeminiEmbeddingAdapter(EmbeddingAdapter):
                         raise QuotaExhaustedException("Gemini API rate limit or quota exceeded.")
                     backoff = (2 ** attempt) + random.uniform(0.1, 0.5)
                     await asyncio.sleep(backoff)
+                elif resp.status_code == 404:
+                    # Model not found, trigger fallback if available
+                    for fallback in self.FALLBACK_MODELS:
+                        if fallback != self.model:
+                            logger.warning(f"Embedding model '{self.model}' returned 404; falling back to '{fallback}'")
+                            self.model = fallback
+                            new_endpoint = f"models/{fallback}:" + endpoint.split(":")[1]
+                            new_json = dict(json_data)
+                            if "model" in new_json:
+                                new_json["model"] = f"models/{fallback}"
+                            if "requests" in new_json:
+                                new_json["requests"] = [
+                                    {**req, "model": f"models/{fallback}"} for req in new_json["requests"]
+                                ]
+                            return await self._post_with_retry(new_endpoint, new_json, max_retries=1)
+                    err_msg = resp.text[:200]
+                    raise ProviderUnavailableException(f"Gemini API returned error HTTP {resp.status_code}: {err_msg}")
                 elif resp.status_code >= 500:
                     if attempt == max_retries - 1:
                         raise ProviderUnavailableException("Gemini API server unavailable.")

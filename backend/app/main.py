@@ -2,12 +2,13 @@
 
 import uuid
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.core.database import Base, engine
+from app.core.database import Base, engine, get_db
 from app.core.errors import ProofLensException, generic_exception_handler, prooflens_exception_handler
 from app.core.logging import logger, setup_logging
 
@@ -74,10 +75,9 @@ async def health_check():
 
 
 @app.get("/api/v1/ready", tags=["system"])
-async def readiness_check():
+async def readiness_check(db: AsyncSession = Depends(get_db)):
     try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1;"))
+        await db.execute(text("SELECT 1;"))
         return {
             "status": "ready",
             "database": "connected",

@@ -4,8 +4,47 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 import pypdf
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from app.main import app
-from app.core.database import Base, engine
+from app.core.config import settings
+from app.core.database import Base, get_db
+
+TEST_DATABASE_URL = "sqlite+aiosqlite:///./test_prooflens.db"
+test_engine = create_async_engine(
+    TEST_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+)
+TestSessionLocal = async_sessionmaker(
+    test_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
+
+
+async def override_get_db():
+    async with TestSessionLocal() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
+@pytest.fixture(autouse=True)
+def override_db_dependency():
+    app.dependency_overrides[get_db] = override_get_db
+    orig_emb = settings.EMBEDDING_PROVIDER
+    orig_llm = settings.LLM_PROVIDER
+    settings.EMBEDDING_PROVIDER = "mock"
+    settings.LLM_PROVIDER = "mock"
+    yield
+    app.dependency_overrides.pop(get_db, None)
+    settings.EMBEDDING_PROVIDER = orig_emb
+    settings.LLM_PROVIDER = orig_llm
 
 
 @pytest.fixture(scope="session")
@@ -50,8 +89,8 @@ def second_sample_pdf_bytes() -> bytes:
 
 @pytest_asyncio.fixture
 async def async_client():
-    # Setup test tables freshly
-    async with engine.begin() as conn:
+    # Setup test tables freshly in isolated test database
+    async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 

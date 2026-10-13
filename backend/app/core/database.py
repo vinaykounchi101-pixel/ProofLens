@@ -6,17 +6,43 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import TypeDecorator, JSON, event
 from app.core.config import settings
 
+from sqlalchemy.pool import NullPool
+
 # Engine setup
 connect_args = {}
 if "sqlite" in settings.DATABASE_URL:
     connect_args = {"check_same_thread": False}
-
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=False,
-    future=True,
-    connect_args=connect_args,
-)
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=False,
+        future=True,
+        connect_args=connect_args,
+    )
+elif "pooler" in settings.DATABASE_URL or "supabase" in settings.DATABASE_URL:
+    # Disable asyncpg statement caching and use NullPool + pool_pre_ping for Supabase poolers
+    connect_args = {
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    }
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=False,
+        future=True,
+        connect_args=connect_args,
+        poolclass=NullPool,
+        pool_pre_ping=True,
+    )
+else:
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=False,
+        future=True,
+        connect_args=connect_args,
+        pool_size=settings.DB_POOL_SIZE,
+        max_overflow=settings.DB_MAX_OVERFLOW,
+        pool_pre_ping=True,
+        pool_recycle=300,
+    )
 
 # Enforce foreign key constraints and cascades in SQLite
 if "sqlite" in settings.DATABASE_URL:

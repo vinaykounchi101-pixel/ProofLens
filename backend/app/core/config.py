@@ -9,7 +9,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            str(Path(__file__).resolve().parent.parent.parent / ".env"),
+            ".env",
+        ),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=True,
@@ -44,14 +47,14 @@ class Settings(BaseSettings):
     # AI Provider: Embeddings (gemini-embedding-2 verified active)
     EMBEDDING_PROVIDER: str = "mock"  # "gemini" or "mock"
     EMBEDDING_API_KEY: SecretStr = SecretStr("")
-    EMBEDDING_MODEL: str = "models/gemini-embedding-2"
+    EMBEDDING_MODEL: str = "gemini-embedding-2"
     EMBEDDING_DIMENSIONS: int = 768
     EMBEDDING_BATCH_SIZE: int = 16
 
-    # AI Provider: LLM Generation (gemini-2.5-flash verified active)
+    # AI Provider: LLM Generation (gemini-3.5-flash verified active)
     LLM_PROVIDER: str = "mock"  # "gemini" or "mock"
     LLM_API_KEY: SecretStr = SecretStr("")
-    LLM_MODEL: str = "gemini-2.5-flash"
+    LLM_MODEL: str = "gemini-3.5-flash"
     LLM_TEMPERATURE: float = 0.0
     LLM_TIMEOUT_SECONDS: int = 30
 
@@ -64,9 +67,58 @@ class Settings(BaseSettings):
     MAX_DAILY_QUERIES: int = 200
 
     # Development & Auth Configuration
-    DEFAULT_DEV_USER_ID: str = "dev-user-00000000-0000-0000-0000-000000000001"
+    DEFAULT_DEV_USER_ID: str = "00000000-0000-0000-0000-000000000001"
     DEFAULT_DEV_USER_EMAIL: str = "dev@prooflens.local"
     DEFAULT_DEV_API_KEY: str = "prooflens_dev_api_key_test_12345"
+
+    @field_validator("EMBEDDING_MODEL", mode="before")
+    @classmethod
+    def normalize_embedding_model(cls, v: str) -> str:
+        if isinstance(v, str):
+            clean = v.strip().strip('"').strip("'").lower()
+            if clean in ("", "gemini", "default", "models/gemini"):
+                return "gemini-embedding-2"
+            if clean.startswith("models/"):
+                return clean[len("models/"):]
+            return clean
+        return "gemini-embedding-2"
+
+    @field_validator("LLM_MODEL", mode="before")
+    @classmethod
+    def normalize_llm_model(cls, v: str) -> str:
+        if isinstance(v, str):
+            clean = v.strip().strip('"').strip("'").lower()
+            if clean in ("", "gemini", "default", "models/gemini", "gemini-2.5-flash", "models/gemini-2.5-flash"):
+                return "gemini-3.5-flash"
+            if clean.startswith("models/"):
+                return clean[len("models/"):]
+            return clean
+        return "gemini-3.5-flash"
+
+    @field_validator("DEFAULT_DEV_USER_ID", mode="before")
+    @classmethod
+    def ensure_dev_user_id_length(cls, v: str) -> str:
+        if isinstance(v, str) and len(v) > 36:
+            if "00000000-" in v:
+                return v[v.index("00000000-"):]
+            return v[:36]
+        return v
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def normalize_database_url(cls, v: str) -> str:
+        if isinstance(v, str):
+            v = v.strip().strip('"').strip("'")
+            # Strip accidental repeated prefix (e.g. DATABASE_URL=DATABASE_URL=...)
+            while v.startswith("DATABASE_URL="):
+                v = v[len("DATABASE_URL="):].strip().strip('"').strip("'")
+            # Render / Heroku inject 'postgres://' which SQLAlchemy 2.0 rejects
+            if v.startswith("postgres://"):
+                return v.replace("postgres://", "postgresql+asyncpg://", 1)
+            # Standard 'postgresql://' without async driver specification
+            elif v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
     @field_validator("STORAGE_DIR", mode="after")
     @classmethod

@@ -97,8 +97,14 @@ async def prooflens_exception_handler(request: Request, exc: ProofLensException)
     payload = {
         "error_code": exc.error_code,
         "message": exc.message,
+        "detail": exc.message,
         "details": exc.details,
         "request_id": request_id,
+        "error": {
+            "code": exc.error_code,
+            "message": exc.message,
+            "details": exc.details,
+        },
     }
     return JSONResponse(status_code=exc.status_code, content=payload)
 

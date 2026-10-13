@@ -86,11 +86,10 @@ class PDFService:
                 )
             )
 
-        # Scanned PDF and usability heuristic:
-        # If total characters across document < 50 or >80% of pages are blank, fail with actionable error
-        if total_chars < 50 or (total_pages > 1 and blank_pages / total_pages >= 0.8):
+        # If total characters across document is 0, then the document has no digital text layer (scanned/image-only)
+        if total_chars == 0:
             raise UnprocessablePDFException(
-                "Document appears to be scanned or contains image-only text. Scanned PDFs are not supported in the MVP without OCR."
+                "Document contains no extractable text. Scanned or image-only PDFs without an embedded text layer are not supported."
             )
 
         return extracted_pages

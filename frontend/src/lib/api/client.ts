@@ -37,13 +37,26 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
 
     try {
       const parsed = await response.json();
-      if (parsed.error) {
+      if (parsed.error && parsed.error.message) {
         errorData = parsed;
+      } else if (parsed.message) {
+        errorData = {
+          error: {
+            code: parsed.error_code || 'API_ERROR',
+            message: parsed.message,
+            details: parsed.details,
+          },
+        };
       } else if (parsed.detail) {
+        const detailMsg = Array.isArray(parsed.detail)
+          ? parsed.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ')
+          : typeof parsed.detail === 'string'
+          ? parsed.detail
+          : JSON.stringify(parsed.detail);
         errorData = {
           error: {
             code: 'API_ERROR',
-            message: typeof parsed.detail === 'string' ? parsed.detail : JSON.stringify(parsed.detail),
+            message: detailMsg,
           },
         };
       }
