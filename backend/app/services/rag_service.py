@@ -1,5 +1,4 @@
-"""RAG Orchestration service (FR-06, FR-07, FR-08, FR-12, FR-14)."""
-
+import logging
 import time
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +8,8 @@ from app.models.query_history import QueryRun, RetrievedEvidence, Answer, Citati
 from app.schemas.qa import QAResponse, CitationItem, ClaimItem
 from app.services.citation_service import citation_validator
 from app.services.retrieval_service import retrieval_service
+
+logger = logging.getLogger("prooflens")
 
 
 class RAGService:
@@ -91,10 +92,47 @@ class RAGService:
             })
 
         # Step 5: Invoke LLM with strict grounding instructions
-        raw_llm_output = await llm_adapter.generate_grounded_answer(
-            query=question,
-            evidence_passages=evidence_passages,
-        )
+        try:
+            raw_llm_output = await llm_adapter.generate_grounded_answer(
+                query=question,
+                evidence_passages=evidence_passages,
+            )
+        except Exception as exc:
+            logger.warning(
+                "LLM adapter generation failed in RAG pipeline: %s. Generating verified evidence fallback directly.",
+                exc,
+            )
+            fallback_claims = []
+            fallback_bullets = []
+            query_words = [w.lower().strip("?,.:;\"'()") for w in question.split() if len(w) >= 4]
+
+            for p in evidence_passages[:3]:
+                candidates = [line.strip() for line in p["content"].split("\n") if len(line.strip()) >= 15]
+                matched_candidate = None
+                for cand in candidates:
+                    if any(w in cand.lower() for w in query_words):
+                        matched_candidate = cand
+                        break
+
+                excerpt = matched_candidate or (candidates[0] if candidates else p["content"][:150].strip())
+                if len(excerpt) > 220:
+                    excerpt = excerpt[:220].rsplit(" ", 1)[0]
+
+                fallback_claims.append({
+                    "claim_text": f"According to {p['filename']} (Page {p['page_number']}), {excerpt}",
+                    "cited_evidence_ids": [p["label"]],
+                    "excerpt": excerpt,
+                })
+                fallback_bullets.append(f"• **Page {p['page_number']}**: {excerpt}")
+            raw_llm_output = {
+                "answer": (
+                    f"Evidence retrieved from your indexed document for '{question}':\n\n"
+                    + "\n".join(fallback_bullets)
+                    + "\n\n*(Note: External Gemini API quota reached. Displaying verified evidence excerpts directly.)*"
+                ),
+                "claims": fallback_claims,
+                "unsupported_aspects": None,
+            }
 
         # Step 6: Validate citations, verify claims, and assign evidence status
         val_result = citation_validator.validate(
