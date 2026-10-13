@@ -98,19 +98,21 @@ export default function DocumentsPage() {
       return;
     }
     try {
-      await api.deleteDocument(docId);
+      setError(null);
+      await api.deleteDocument(docId, workspaceId);
       setDocuments((prev) => prev.filter((d) => d.id !== docId));
     } catch (err: any) {
-      alert(`Deletion failed: ${err.message}`);
+      setError(`Deletion failed: ${err.message}`);
     }
   }
 
   async function handleRetry(docId: string) {
     try {
-      const updated = await api.retryDocument(docId);
+      setError(null);
+      const updated = await api.retryDocument(docId, workspaceId);
       setDocuments((prev) => prev.map((d) => (d.id === docId ? updated : d)));
     } catch (err: any) {
-      alert(`Retry failed: ${err.message}`);
+      setError(err.message || 'Retry failed.');
     }
   }
 
@@ -122,7 +124,7 @@ export default function DocumentsPage() {
       const summary = await api.getDocumentSummary(doc.id);
       setSelectedDocSummary(summary);
     } catch (err: any) {
-      alert(`Could not generate summary: ${err.message}`);
+      setError(`Could not generate summary: ${err.message}`);
       setActiveDocForSummary(null);
     } finally {
       setSummaryLoading(false);
@@ -284,13 +286,19 @@ export default function DocumentsPage() {
                         <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600">
                           <FileText className="h-4 w-4" />
                         </div>
-                        <div className="max-w-[240px] truncate sm:max-w-xs">
+                        <div className="max-w-[280px] sm:max-w-sm">
                           <div className="font-medium text-slate-900 truncate" title={doc.filename}>
                             {doc.filename}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            {new Date(doc.created_at).toLocaleString()}
-                          </div>
+                          {doc.error_message ? (
+                            <div className="text-[11px] text-rose-600 line-clamp-1 font-sans" title={doc.error_message}>
+                              {doc.error_message}
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              {new Date(doc.created_at).toLocaleString()}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
