@@ -88,7 +88,7 @@ graph TD
 
 ### Phase 7: Genuine Evaluation Baseline & Test Matrix
 - **Status:** Complete (100%)
-- **Deliverables:** Removed all hardcoded precision/recall metrics. Version-controlled 25-case benchmark corpus (`backend/tests/evaluation/dataset.json`). Comprehensive 23-test automated test suite across unit, integration, isolation, and evaluation. Docker Compose file for local PostgreSQL 16 + pgvector.
+- **Deliverables:** Removed all hardcoded precision/recall metrics. Version-controlled 25-case benchmark corpus (`backend/tests/evaluation/dataset.json`). Comprehensive 27-test automated test suite across unit, integration, isolation, evaluation, and database URL resilience. Docker Compose file for local PostgreSQL 16 + pgvector.
 
 ---
 
@@ -96,6 +96,6 @@ graph TD
 
 | Check | Command | Result |
 |---|---|---|
-| Backend Pytest Suite | `.\backend\.venv\Scripts\python.exe -m pytest -o pythonpath=backend backend/tests -v` | **23 passed in 2.35s (100%)** |
+| Backend Pytest Suite | `.\backend\.venv\Scripts\python.exe -m pytest -o pythonpath=backend backend/tests -v` | **27 passed in 2.43s (100%)** |
 | Frontend TypeCheck & Build | `cd frontend && npm run build` | **Compiled successfully (0 errors)** |
 | Database Migrations | `.\backend\.venv\Scripts\alembic.exe upgrade head` | **Upgrade head clean (exit code 0)** |

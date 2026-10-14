@@ -1,6 +1,7 @@
 """Centralized application configuration using Pydantic Settings."""
 
 import os
+import urllib.parse
 from pathlib import Path
 from typing import List, Union, Any
 from pydantic import Field, SecretStr, field_validator
@@ -123,12 +124,36 @@ class Settings(BaseSettings):
             # Strip accidental repeated prefix (e.g. DATABASE_URL=DATABASE_URL=...)
             while v.startswith("DATABASE_URL="):
                 v = v[len("DATABASE_URL="):].strip().strip('"').strip("'")
+            # Strip JDBC prefix if provided by mistake (e.g. from Supabase dashboard JDBC tab)
+            if v.startswith("jdbc:"):
+                v = v[len("jdbc:"):].strip()
+
             # Render / Heroku inject 'postgres://' which SQLAlchemy 2.0 rejects
             if v.startswith("postgres://"):
-                return v.replace("postgres://", "postgresql+asyncpg://", 1)
+                v = v.replace("postgres://", "postgresql+asyncpg://", 1)
             # Standard 'postgresql://' without async driver specification
             elif v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
-                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+            # If JDBC-style query parameters were passed (e.g. ?user=...&password=...)
+            if "?" in v:
+                base, query_str = v.split("?", 1)
+                if "@" not in base:
+                    parsed_q = urllib.parse.parse_qs(query_str)
+                    user = parsed_q.get("user", [None])[0]
+                    password = parsed_q.get("password", [None])[0]
+                    if user:
+                        remaining = {k: val for k, val in parsed_q.items() if k not in ("user", "password")}
+                        user_enc = urllib.parse.quote(user, safe="")
+                        pass_enc = urllib.parse.quote(password, safe="") if password else ""
+                        auth_part = f"{user_enc}:{pass_enc}@" if pass_enc else f"{user_enc}@"
+                        if "://" in base:
+                            scheme, rest = base.split("://", 1)
+                            new_base = f"{scheme}://{auth_part}{rest}"
+                        else:
+                            new_base = f"{auth_part}{base}"
+                        rem_query = urllib.parse.urlencode(remaining, doseq=True)
+                        v = f"{new_base}?{rem_query}" if rem_query else new_base
         return v
 
     @field_validator("STORAGE_DIR", mode="after")
