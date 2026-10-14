@@ -26,45 +26,26 @@ This reference guide contains the exact environment variables and configuration 
 Paste the following block into Render's **Environment** tab using **"Add from .env"** or enter each key manually:
 
 ```ini
-# Application Mode
 ENVIRONMENT=production
 PROJECT_NAME="ProofLens AI"
 API_V1_STR=/api/v1
-
-# Security: Generate a secure 32-byte secret using: python -c "import secrets; print(secrets.token_hex(32))"
 SECRET_KEY=replace-with-a-random-32-byte-hex-string
-
-# Database: PostgreSQL with pgvector (Supabase or Render PostgreSQL)
-# Note: Format must start with postgresql+asyncpg:// (our config auto-normalizes postgres:// and jdbc: prefixes)
 DATABASE_URL=postgresql+asyncpg://postgres.[YOUR-PROJECT-REF]:[YOUR-PASSWORD]@aws-0-[YOUR-REGION].pooler.supabase.com:5432/postgres
 DB_POOL_SIZE=5
 DB_MAX_OVERFLOW=10
-
-# CORS Allowed Origins: Add your Vercel deployment domain here once created
-# Supports comma-separated list or JSON array format
 ALLOWED_ORIGINS=https://your-frontend-app.vercel.app,http://localhost:3000
-
-# File Storage in Render container
 STORAGE_DIR=data/storage
 MAX_UPLOAD_SIZE_BYTES=15728640
 MAX_PAGES_PER_DOCUMENT=50
-
-# Google Gemini API Key (populates both embeddings and LLM generation)
 GEMINI_API_KEY=your-gemini-api-key-here
-
-# AI Providers & Models
 EMBEDDING_PROVIDER=gemini
 LLM_PROVIDER=gemini
 EMBEDDING_MODEL=gemini-embedding-2
 LLM_MODEL=gemini-3-flash-preview
 EMBEDDING_DIMENSIONS=768
 EMBEDDING_BATCH_SIZE=16
-
-# Grounding & Retrieval Guardrails
 RETRIEVAL_TOP_K=5
 RETRIEVAL_SIMILARITY_THRESHOLD=0.65
-
-# Rate Limits (FR-14)
 RATE_LIMIT_PER_MINUTE=15
 MAX_DAILY_QUERIES=200
 ```
@@ -108,7 +89,6 @@ MAX_DAILY_QUERIES=200
 Add the following variable under **Project Settings > Environment Variables** in Vercel:
 
 ```ini
-# Backend API Base URL (must include /api/v1 suffix)
 NEXT_PUBLIC_API_URL=https://your-backend-service.onrender.com/api/v1
 ```
 
