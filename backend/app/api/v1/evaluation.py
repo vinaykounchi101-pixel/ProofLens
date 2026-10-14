@@ -10,10 +10,29 @@ from app.core.errors import ResourceNotFoundException, ValidationException
 from app.models.evaluation import EvaluationRun, EvaluationResult
 from app.models.workspace import Workspace
 from app.models.user import User
-from app.schemas.evaluation import EvaluationRunRequest, EvaluationRunResponse, EvaluationMetrics, EvaluationCaseResult
+from app.schemas.evaluation import (
+    EvaluationRunRequest,
+    EvaluationRunResponse,
+    EvaluationMetrics,
+    EvaluationCaseResult,
+    LiveEvaluationSummary,
+)
 from app.services.evaluation_service import evaluation_service
 
 router = APIRouter(tags=["evaluation"])
+
+
+@router.get("/workspaces/{workspace_id}/evaluation/live", response_model=LiveEvaluationSummary)
+async def get_workspace_live_evaluation(
+    workspace_id: str,
+    workspace: Workspace = Depends(get_authorized_workspace),
+    session: AsyncSession = Depends(get_db),
+):
+    """Returns dynamic evaluation metrics computed from the questions the user asked in this workspace."""
+    return await evaluation_service.get_live_evaluation(
+        session=session,
+        workspace_id=workspace.id,
+    )
 
 
 @router.post("/workspaces/{workspace_id}/evaluation/run", response_model=EvaluationRunResponse)

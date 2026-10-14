@@ -32,3 +32,30 @@ class EvaluationRunResponse(BaseModel):
     metrics: EvaluationMetrics
     failed_results: List[EvaluationCaseResult] = []
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class LiveQueryEvaluationItem(BaseModel):
+    query_id: str
+    question: str
+    evidence_status: str
+    answer_text: Optional[str] = None
+    created_at: datetime
+    latency_ms: Optional[int] = None
+    total_citations: int = 0
+    valid_citations: int = 0
+    citation_validity_rate: float = 1.0
+    has_hallucinations: bool = False
+    is_abstention: bool = False
+
+
+class LiveEvaluationSummary(BaseModel):
+    workspace_id: str
+    total_queries: int = 0
+    supported_queries: int = 0
+    abstention_queries: int = 0
+    citation_validity_rate: float = 0.0
+    abstention_rate: float = 0.0
+    hallucination_rate: float = 0.0
+    avg_latency_ms: float = 0.0
+    evaluated_queries: List[LiveQueryEvaluationItem] = []
+

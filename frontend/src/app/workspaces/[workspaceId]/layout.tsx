@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useParams } from 'next/navigation';
+import { usePathname, useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Workspace } from '@/lib/types/api';
 import {
@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Shield,
   Layers,
+  Trash2,
 } from 'lucide-react';
 
 export default function WorkspaceLayout({
@@ -23,6 +24,7 @@ export default function WorkspaceLayout({
 }) {
   const params = useParams();
   const pathname = usePathname();
+  const router = useRouter();
   const workspaceId = params.workspaceId as string;
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -36,6 +38,19 @@ export default function WorkspaceLayout({
         .finally(() => setLoading(false));
     }
   }, [workspaceId]);
+
+  async function handleDeleteWorkspace() {
+    if (!workspace) return;
+    if (!window.confirm(`Are you sure you want to permanently delete workspace "${workspace.name}"?\nAll documents and query history will be deleted.`)) {
+      return;
+    }
+    try {
+      await api.deleteWorkspace(workspaceId);
+      router.push('/workspaces');
+    } catch (err: any) {
+      alert(`Failed to delete workspace: ${err.message}`);
+    }
+  }
 
   const navItems = [
     {
@@ -104,6 +119,14 @@ export default function WorkspaceLayout({
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Evidence Engine Active
             </div>
+            <button
+              onClick={handleDeleteWorkspace}
+              title="Delete this workspace"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Delete Workspace</span>
+            </button>
           </div>
         </div>
 

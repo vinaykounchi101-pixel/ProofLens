@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Layers,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 
 export default function QAPage() {
@@ -28,6 +29,8 @@ export default function QAPage() {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [answer, setAnswer] = useState<AnswerResponse | null>(null);
+  const [isSaved, setIsSaved] = useState(true);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showRetrievedEvidence, setShowRetrievedEvidence] = useState(false);
 
@@ -48,6 +51,7 @@ export default function QAPage() {
       setLoading(true);
       setError(null);
       setAnswer(null);
+      setSaveNotice(null);
 
       const res = await api.askQuestion(workspaceId, {
         question: question.trim(),
@@ -55,10 +59,39 @@ export default function QAPage() {
       });
 
       setAnswer(res);
+      setIsSaved(true);
     } catch (err: any) {
       setError(err.message || 'Failed to process inquiry.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleToggleSave() {
+    if (!answer?.query_run_id) return;
+    try {
+      const res = await api.toggleSaveQueryRun(workspaceId, answer.query_run_id);
+      setIsSaved(res.is_saved);
+      setSaveNotice(res.is_saved ? 'Answer saved to query history!' : 'Removed from saved history.');
+      setTimeout(() => setSaveNotice(null), 3000);
+    } catch (err: any) {
+      console.error('Failed to toggle save:', err);
+    }
+  }
+
+  async function handleDeleteConversation() {
+    if (!window.confirm('Delete this conversation? This will clear the screen and remove this record from history.')) {
+      return;
+    }
+    try {
+      if (answer?.query_run_id) {
+        await api.deleteQueryRun(workspaceId, answer.query_run_id);
+      }
+    } catch (err: any) {
+      console.error('Failed to delete query run from server:', err);
+    } finally {
+      setAnswer(null);
+      setQuestion('');
     }
   }
 
@@ -181,7 +214,40 @@ export default function QAPage() {
 
       {/* Answer Output View */}
       {answer && (
-        <div className="space-y-6">
+        <div className="space-y-4">
+          {/* Conversation Actions Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleToggleSave}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition shadow-xs ${
+                  isSaved
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <Bookmark className={`h-3.5 w-3.5 ${isSaved ? 'fill-emerald-600 text-emerald-600' : ''}`} />
+                <span>{isSaved ? 'Saved to History' : 'Save Query & Answer'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteConversation}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 shadow-xs transition"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Conversation</span>
+              </button>
+            </div>
+
+            {saveNotice && (
+              <span className="text-xs font-medium text-emerald-600">
+                ✓ {saveNotice}
+              </span>
+            )}
+          </div>
+
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             {/* Answer Header Badges */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">

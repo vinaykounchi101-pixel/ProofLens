@@ -47,12 +47,41 @@ class GeminiLLMAdapter(LLMAdapter):
         cleaned = cleaned.strip()
 
         try:
-            return json.loads(cleaned)
+            parsed = json.loads(cleaned)
+            if isinstance(parsed, list):
+                # When LLM returns a list of claim items, wrap into expected dict schema
+                claims = [item for item in parsed if isinstance(item, dict)]
+                answer_lines = [c.get("claim_text", "") for c in claims if c.get("claim_text")]
+                return {
+                    "answer": "\n\n".join(answer_lines) if answer_lines else str(parsed),
+                    "claims": claims,
+                    "unsupported_aspects": None,
+                }
+            if isinstance(parsed, dict):
+                return parsed
+            return {}
         except json.JSONDecodeError:
             match = re.search(r"(\{.*\})", cleaned, re.DOTALL)
             if match:
                 try:
-                    return json.loads(match.group(1))
+                    res = json.loads(match.group(1))
+                    if isinstance(res, dict):
+                        return res
+                except json.JSONDecodeError:
+                    pass
+            # Try matching array format as fallback
+            arr_match = re.search(r"(\[.*\])", cleaned, re.DOTALL)
+            if arr_match:
+                try:
+                    arr_res = json.loads(arr_match.group(1))
+                    if isinstance(arr_res, list):
+                        claims = [item for item in arr_res if isinstance(item, dict)]
+                        answer_lines = [c.get("claim_text", "") for c in claims if c.get("claim_text")]
+                        return {
+                            "answer": "\n\n".join(answer_lines) if answer_lines else str(arr_res),
+                            "claims": claims,
+                            "unsupported_aspects": None,
+                        }
                 except json.JSONDecodeError:
                     pass
             return {}

@@ -72,6 +72,24 @@ class Settings(BaseSettings):
     DEFAULT_DEV_USER_EMAIL: str = "dev@prooflens.local"
     DEFAULT_DEV_API_KEY: str = "prooflens_dev_api_key_test_12345"
 
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def normalize_allowed_origins(cls, v: Any) -> List[str]:
+        if isinstance(v, str):
+            clean = v.strip().strip('"').strip("'")
+            if clean.startswith("[") and clean.endswith("]"):
+                try:
+                    import json
+                    parsed = json.loads(clean)
+                    if isinstance(parsed, list):
+                        return [str(item).strip().strip('"').strip("'") for item in parsed if str(item).strip()]
+                except Exception:
+                    pass
+            return [part.strip().strip('"').strip("'") for part in clean.replace("\n", ",").split(",") if part.strip()]
+        if isinstance(v, list):
+            return [str(item).strip().strip('"').strip("'") for item in v if str(item).strip()]
+        return ["http://localhost:3000", "http://127.0.0.1:3000"]
+
     @field_validator("EMBEDDING_MODEL", mode="before")
     @classmethod
     def normalize_embedding_model(cls, v: str) -> str:

@@ -15,6 +15,7 @@ class QueryRun(Base):
     query_text: Mapped[str] = mapped_column(Text, nullable=False)
     selected_doc_ids: Mapped[list] = mapped_column(JSON, nullable=False)
     evidence_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    is_saved: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

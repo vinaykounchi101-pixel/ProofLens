@@ -4,11 +4,19 @@ import json
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import logger
 from app.models.document import Document
 from app.models.evaluation import EvaluationRun, EvaluationResult
-from app.schemas.evaluation import EvaluationRunResponse, EvaluationMetrics, EvaluationCaseResult
+from app.models.query_history import QueryRun, Answer, Citation
+from app.schemas.evaluation import (
+    EvaluationRunResponse,
+    EvaluationMetrics,
+    EvaluationCaseResult,
+    LiveEvaluationSummary,
+    LiveQueryEvaluationItem,
+)
 from app.services.rag_service import rag_service
 
 
@@ -220,5 +228,95 @@ class EvaluationService:
             failed_results=failed_results,
         )
 
+    @staticmethod
+    async def get_live_evaluation(
+        session: AsyncSession,
+        workspace_id: str,
+    ) -> LiveEvaluationSummary:
+        """Calculates live evaluation metrics based on the real questions asked by the user in this workspace."""
+        stmt = (
+            select(QueryRun)
+            .options(selectinload(QueryRun.answer).selectinload(Answer.citations))
+            .where(QueryRun.workspace_id == workspace_id)
+            .order_by(QueryRun.created_at.desc())
+        )
+        res = await session.execute(stmt)
+        runs = res.scalars().all()
+
+        if not runs:
+            return LiveEvaluationSummary(workspace_id=workspace_id)
+
+        total_queries = len(runs)
+        supported_queries = 0
+        abstention_queries = 0
+        total_citations = 0
+        total_valid_citations = 0
+        total_latency = 0
+        latency_count = 0
+        evaluated_items: List[LiveQueryEvaluationItem] = []
+
+        for r in runs:
+            status = r.evidence_status or "supported"
+            if status == "supported":
+                supported_queries += 1
+            elif status == "insufficient_evidence":
+                abstention_queries += 1
+
+            q_citations = 0
+            q_valid_citations = 0
+            ans_text = None
+            latency = None
+
+            if r.answer:
+                ans_text = r.answer.answer_text
+                latency = r.answer.latency_ms
+                if latency is not None:
+                    total_latency += latency
+                    latency_count += 1
+
+                for c in r.answer.citations:
+                    q_citations += 1
+                    total_citations += 1
+                    if c.is_verified and c.is_reference_valid and c.is_excerpt_valid and not c.is_repaired:
+                        q_valid_citations += 1
+                        total_valid_citations += 1
+
+            q_validity = (q_valid_citations / q_citations) if q_citations > 0 else 1.0
+            has_hallucinations = (q_citations > q_valid_citations)
+
+            evaluated_items.append(
+                LiveQueryEvaluationItem(
+                    query_id=r.id,
+                    question=r.query_text,
+                    evidence_status=status,
+                    answer_text=ans_text,
+                    created_at=r.created_at,
+                    latency_ms=latency,
+                    total_citations=q_citations,
+                    valid_citations=q_valid_citations,
+                    citation_validity_rate=round(q_validity, 2),
+                    has_hallucinations=has_hallucinations,
+                    is_abstention=(status == "insufficient_evidence"),
+                )
+            )
+
+        citation_validity_rate = round(total_valid_citations / total_citations, 2) if total_citations > 0 else 1.0
+        abstention_rate = round(abstention_queries / total_queries, 2) if total_queries > 0 else 0.0
+        hallucination_rate = round((total_citations - total_valid_citations) / max(1, total_citations), 2) if total_citations > 0 else 0.0
+        avg_latency_ms = round(total_latency / latency_count, 1) if latency_count > 0 else 0.0
+
+        return LiveEvaluationSummary(
+            workspace_id=workspace_id,
+            total_queries=total_queries,
+            supported_queries=supported_queries,
+            abstention_queries=abstention_queries,
+            citation_validity_rate=citation_validity_rate,
+            abstention_rate=abstention_rate,
+            hallucination_rate=hallucination_rate,
+            avg_latency_ms=avg_latency_ms,
+            evaluated_queries=evaluated_items,
+        )
+
 
 evaluation_service = EvaluationService()
+

@@ -130,3 +130,49 @@ async def test_complete_evidence_first_rag_lifecycle(
     remaining_docs = list_after_del.json()
     assert len(remaining_docs) == 1
     assert remaining_docs[0]["id"] == doc_2_id
+
+    # 12. Toggle Save / Bookmark Query Run
+    first_query_id = history_items[0]["id"]
+    save_res = await async_client.post(
+        f"/api/v1/workspaces/{ws_id}/history/{first_query_id}/save"
+    )
+    assert save_res.status_code == 200
+    save_data = save_res.json()
+    assert save_data["query_id"] == first_query_id
+    assert "is_saved" in save_data
+
+    # 12b. Verify Live Query Evaluation computed from user asked questions
+    live_eval_res = await async_client.get(
+        f"/api/v1/workspaces/{ws_id}/evaluation/live"
+    )
+    assert live_eval_res.status_code == 200
+    live_eval_data = live_eval_res.json()
+    assert live_eval_data["total_queries"] >= 2
+    assert live_eval_data["supported_queries"] >= 1
+    assert live_eval_data["abstention_queries"] >= 1
+    assert live_eval_data["citation_validity_rate"] >= 0.8
+    assert len(live_eval_data["evaluated_queries"]) >= 2
+
+    # 13. Delete Single Query Run
+    del_query_res = await async_client.delete(
+        f"/api/v1/workspaces/{ws_id}/history/{first_query_id}"
+    )
+    assert del_query_res.status_code == 204
+
+    # 14. Clear All History for Workspace
+    clear_res = await async_client.delete(f"/api/v1/workspaces/{ws_id}/history")
+    assert clear_res.status_code == 204
+
+    # Verify history is now empty
+    hist_after_clear = await async_client.get(f"/api/v1/workspaces/{ws_id}/history")
+    assert hist_after_clear.status_code == 200
+    assert len(hist_after_clear.json()) == 0
+
+    # 15. Delete Workspace
+    del_ws_res = await async_client.delete(f"/api/v1/workspaces/{ws_id}")
+    assert del_ws_res.status_code == 204
+
+    # Verify workspace is gone
+    get_ws_res = await async_client.get(f"/api/v1/workspaces/{ws_id}")
+    assert get_ws_res.status_code == 404
+

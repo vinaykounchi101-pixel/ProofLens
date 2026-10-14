@@ -15,6 +15,7 @@ import {
   QueryRun,
   EvaluationRun,
   EvaluationRunListResponse,
+  LiveEvaluationSummary,
 } from '../types/api';
 
 export const api = {
@@ -34,6 +35,12 @@ export const api = {
 
   async getWorkspace(workspaceId: string): Promise<Workspace> {
     return apiFetch<Workspace>(`/workspaces/${workspaceId}`);
+  },
+
+  async deleteWorkspace(workspaceId: string): Promise<void> {
+    await apiFetch<void>(`/workspaces/${workspaceId}`, {
+      method: 'DELETE',
+    });
   },
 
   // Documents
@@ -251,6 +258,10 @@ export const api = {
     const data = await apiFetch<any>(`/workspaces/${workspaceId}/history?limit=${limit}&offset=${offset}`);
     const rawItems: any[] = Array.isArray(data) ? data : data.items || [];
     const items: QueryRun[] = rawItems.map((r: any) => {
+      const runId = r.id || r.query_id || '';
+      const runQuestion = r.question || r.query_text || 'Untitled Question';
+      const answerText = r.answer_text || (typeof r.answer === 'string' ? r.answer : r.answer?.answer_text);
+
       const mappedCitations: Citation[] = (r.citations || []).map((c: any, idx: number) => ({
         citation_index: idx + 1,
         document_id: c.document_id,
@@ -262,31 +273,50 @@ export const api = {
         validation_status: c.is_verified ? 'verified' : (c.is_repaired ? 'repaired' : 'unverified'),
       }));
 
-      const ans = r.answer ? {
-        query_run_id: r.id,
-        question: r.question,
-        answer_text: r.answer.answer_text,
-        evidence_status: r.answer.evidence_status || r.evidence_status,
+      const ans = answerText ? {
+        query_run_id: runId,
+        question: runQuestion,
+        answer_text: answerText,
+        evidence_status: r.evidence_status || 'supported',
         citations: mappedCitations,
         retrieved_evidence: [],
-        insufficient_evidence: (r.answer.evidence_status || r.evidence_status) === 'insufficient_evidence',
-        has_conflicts: (r.answer.evidence_status || r.evidence_status) === 'conflicting_evidence',
+        insufficient_evidence: r.evidence_status === 'insufficient_evidence',
+        has_conflicts: r.evidence_status === 'conflicting_evidence',
         confidence_score: 0.9,
       } : undefined;
 
       return {
-        id: r.id,
+        id: runId,
         workspace_id: r.workspace_id,
-        question: r.question,
+        question: runQuestion,
         document_ids: r.selected_doc_ids || [],
         evidence_status: r.evidence_status,
         answer: ans,
         citations: mappedCitations,
         created_at: r.created_at,
+        is_saved: r.is_saved ?? true,
       };
     });
 
     return { items, total: items.length };
+  },
+
+  async deleteQueryRun(workspaceId: string, queryId: string): Promise<void> {
+    await apiFetch<void>(`/workspaces/${workspaceId}/history/${queryId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async clearHistory(workspaceId: string): Promise<void> {
+    await apiFetch<void>(`/workspaces/${workspaceId}/history`, {
+      method: 'DELETE',
+    });
+  },
+
+  async toggleSaveQueryRun(workspaceId: string, queryId: string): Promise<{ query_id: string; is_saved: boolean }> {
+    return apiFetch<{ query_id: string; is_saved: boolean }>(`/workspaces/${workspaceId}/history/${queryId}/save`, {
+      method: 'POST',
+    });
   },
 
   // Evaluation
@@ -333,6 +363,20 @@ export const api = {
       },
       details: r.case_results || [],
       created_at: r.created_at,
+    };
+  },
+  async getLiveEvaluation(workspaceId: string): Promise<LiveEvaluationSummary> {
+    const data = await apiFetch<any>(`/workspaces/${workspaceId}/evaluation/live`);
+    return {
+      workspace_id: data.workspace_id || workspaceId,
+      total_queries: data.total_queries ?? 0,
+      supported_queries: data.supported_queries ?? 0,
+      abstention_queries: data.abstention_queries ?? 0,
+      citation_validity_rate: data.citation_validity_rate ?? 0.0,
+      abstention_rate: data.abstention_rate ?? 0.0,
+      hallucination_rate: data.hallucination_rate ?? 0.0,
+      avg_latency_ms: data.avg_latency_ms ?? 0.0,
+      evaluated_queries: Array.isArray(data.evaluated_queries) ? data.evaluated_queries : [],
     };
   },
 };

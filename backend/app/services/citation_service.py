@@ -56,6 +56,12 @@ class CitationValidator:
                 unsupported_aspects="No relevant evidence passages found in authorized documents.",
             )
 
+        if not isinstance(raw_llm_output, dict):
+            if isinstance(raw_llm_output, list):
+                raw_llm_output = {"claims": raw_llm_output, "answer": "", "unsupported_aspects": None}
+            else:
+                raw_llm_output = {"claims": [], "answer": str(raw_llm_output) if raw_llm_output else "", "unsupported_aspects": None}
+
         raw_claims = raw_llm_output.get("claims", [])
         unsupported = raw_llm_output.get("unsupported_aspects")
         answer_text = raw_llm_output.get("answer", "")

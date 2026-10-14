@@ -128,6 +128,7 @@ export interface QueryRun {
   answer?: AnswerResponse;
   citations?: Citation[];
   created_at: string;
+  is_saved?: boolean;
 }
 
 export interface HistoryListResponse {
@@ -159,6 +160,32 @@ export interface EvaluationRun {
 export interface EvaluationRunListResponse {
   runs: EvaluationRun[];
   total: number;
+}
+
+export interface LiveQueryEvaluationItem {
+  query_id: string;
+  question: string;
+  evidence_status: string;
+  answer_text?: string | null;
+  created_at: string;
+  latency_ms?: number | null;
+  total_citations: number;
+  valid_citations: number;
+  citation_validity_rate: number;
+  has_hallucinations: boolean;
+  is_abstention: boolean;
+}
+
+export interface LiveEvaluationSummary {
+  workspace_id: string;
+  total_queries: number;
+  supported_queries: number;
+  abstention_queries: number;
+  citation_validity_rate: number;
+  abstention_rate: number;
+  hallucination_rate: number;
+  avg_latency_ms: number;
+  evaluated_queries: LiveQueryEvaluationItem[];
 }
 
 export interface ApiError {

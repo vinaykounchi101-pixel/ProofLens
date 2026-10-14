@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { Workspace } from '@/lib/types/api';
-import { FolderGit2, Plus, Sparkles, Shield, FileText, ArrowRight, X } from 'lucide-react';
+import { FolderGit2, Plus, Sparkles, Shield, FileText, ArrowRight, X, Trash2 } from 'lucide-react';
 
 export default function WorkspacesPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -46,6 +46,18 @@ export default function WorkspacesPage() {
       alert(`Error creating workspace: ${err.message}`);
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleDeleteWorkspace(workspaceId: string, name: string) {
+    if (!window.confirm(`Are you sure you want to permanently delete workspace "${name}"?\nAll indexed documents, vectors, and query history will be removed.`)) {
+      return;
+    }
+    try {
+      await api.deleteWorkspace(workspaceId);
+      setWorkspaces((prev) => prev.filter((w) => w.id !== workspaceId));
+    } catch (err: any) {
+      alert(`Failed to delete workspace: ${err.message}`);
     }
   }
 
@@ -126,9 +138,23 @@ export default function WorkspacesPage() {
                       <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600 group-hover:bg-indigo-100 group-hover:text-indigo-700">
                         <FolderGit2 className="h-5 w-5" />
                       </div>
-                      <span className="text-xs font-mono text-slate-400">
-                        {new Date(ws.created_at).toLocaleDateString()}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-slate-400">
+                          {new Date(ws.created_at).toLocaleDateString()}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDeleteWorkspace(ws.id, ws.name);
+                          }}
+                          title="Delete workspace"
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <h3 className="mt-4 text-base font-semibold text-slate-900 group-hover:text-indigo-600">
                       {ws.name}
